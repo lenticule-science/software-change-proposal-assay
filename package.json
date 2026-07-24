@@ -1,0 +1,56 @@
+{
+  "name": "@emsenn/software-change-proposal-assay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/client.mjs",
+    "./client": "./src/client.mjs",
+    "./executor": "./src/a2a-executor.mjs"
+  },
+  "bin": {
+    "execute-software-change-proposal-assay-a2a-message": "bin/execute-a2a-message.mjs",
+    "serve-software-change-proposal-assay-a2a": "bin/serve-a2a.mjs"
+  },
+  "scripts": {
+    "check": "node --check src/assay.mjs && node --check src/client.mjs && node --check src/a2a-executor.mjs && node --check bin/execute-a2a-message.mjs && node --check bin/serve-a2a.mjs",
+    "test": "node --test",
+    "verify": "npm run check && npm test"
+  },
+  "dependencies": {
+    "@a2a-js/sdk": "1.0.0-beta.0",
+    "@emsenn/a2a-contracted-agent-service": "file:../../../../../red-cup-engineering/services/web-services-section/services/a2a-services-section/services/a2a-contracted-agent-service",
+    "@emsenn/a2a-rmn-part-service": "file:../../../../../red-cup-engineering/services/web-services-section/services/a2a-services-section/services/a2a-rmn-part-service",
+    "@emsenn/a2a-rmn-task-client-service": "file:../../../../../red-cup-engineering/services/web-services-section/services/a2a-services-section/services/a2a-rmn-task-client-service",
+    "@emsenn/rmn-semantic-conformance": "file:../rmn-semantic-conformance",
+    "@emsenn/rwil-rdf-services": "file:../rwil-rdf-services"
+  },
+  "x-agentic-metro-enterprise": {
+    "node-id": "software-change-proposal-assay",
+    "actor": "urn:ame:software-change-proposal-assay",
+    "organizational-kind": "micro-enterprise",
+    "owners": [
+      "obsmetrological-services-section"
+    ],
+    "membrane": {
+      "law": "lib/",
+      "lasting-instances": "content/",
+      "append-only-instances": "data/"
+    },
+    "admission": "one canonical RMN/CBOR SoftwareChangeProposalAssayRequest through the hired A2A 1.0 provider",
+    "refusal": "foreign bindings, source drift, oracle drift, failed replay, inference, customer mutation, or direct JSON/local-process invocation",
+    "operation-catalog": {
+      "assay-software-change-proposal": {
+        "contract": "ni:///sha-256;NDDvpFoaLyCXRcUova9UJUvkdOPnTta0Su6TDm0WMVY",
+        "protocols": [
+          "RMN",
+          "A2A 1.0"
+        ],
+        "accepts": "SoftwareChangeProposalAssayRequest",
+        "returns": "ImprovementCandidateReview",
+        "timeoutMs": 5000,
+        "legacyCompatibility": false
+      }
+    }
+  }
+}
