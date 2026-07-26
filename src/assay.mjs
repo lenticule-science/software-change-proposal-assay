@@ -42,5 +42,5 @@ export function assaySoftwareChangeProposal(request) {
   let issue = null, evidence = null;
   try { if (request?.type !== "SoftwareChangeProposalAssayRequest") throw new Error("exact-assay-request-required"); evidence = replay(request); }
   catch (error) { issue = error instanceof Error ? error.message : String(error); }
-  return record({ type: "ImprovementCandidateReview", actor: ACTOR, candidate: request?.candidate?.id ?? null, accepted: issue === null, reason: issue ?? "exact candidate passed independent provider-local replay of the customer-protected oracle", evidence: { assay: "software-change-proposal-assay/v1", inferenceCalls: 0, customerFilesystemWrites: 0, ...evidence }, authorExcluded: true, customerMutation: false });
+  return record({ type: "ImprovementCandidateReview", actor: ACTOR, candidate: request?.candidate?.id ?? null, accepted: issue === null, reason: issue ?? "exact candidate passed provider-local replay of the customer-protected oracle", evidence: { assay: "software-change-proposal-assay/v1", inferenceCalls: 0, customerFilesystemWrites: 0, ...evidence }, customerMutation: false });
 }
