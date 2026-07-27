@@ -3,8 +3,8 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import { semanticId } from "@emsenn/rmn-semantic-conformance";
-import { relationalRwilDocument } from "@emsenn/rwil-rdf-services/client";
+import { semanticId } from "@red-cup-engineering/rmn-semantic-conformance";
+import { relationalRwilDocument } from "@lenticule-science/rwil-rdf-projection-service/client";
 
 export const ACTOR = "urn:ame:software-change-proposal-assay";
 export function record(body) { return Object.freeze({ id: semanticId(relationalRwilDocument(body)), ...body }); }
