@@ -3,7 +3,7 @@ import { Message, Role } from "@a2a-js/sdk";
 import { a2aResultParts, sendRmnTask } from "@red-cup-engineering/a2a-rmn-task-client-service";
 import { extractRmnPart, rmnPart } from "@red-cup-engineering/a2a-rmn-part-service";
 import { semanticId } from "@red-cup-engineering/rmn-semantic-conformance";
-import { relationalRwilDocument } from "@lenticule-science/rwil-rdf-projection-service/client";
+import { relationalRwilDocument } from "@lenticule-science/witness-journal-rdf-projection-service/client";
 import { ACTOR } from "./assay.mjs";
 import { operationBytes, operationFromBytes } from "./a2a-executor.mjs";
 const id = (value) => semanticId(relationalRwilDocument(value)); const record = (body) => Object.freeze({ id: id(body), ...body });
