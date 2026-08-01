@@ -1,9 +1,0 @@
-#lang rmn/v2
-(map
-  ("type" "SoftwareChangeProposalAssayLaw")
-  ("version" 1)
-  ("precondition" "One exact customer-published software work lot, its award, and the awarded supplier's proposal bytes are supplied; the lot names a pre-existing protected oracle and grants read-only assay of those exact paths.")
-  ("operation" "Validate exact lot, award, candidate identity, target path, source state, protected-oracle digest, and candidate digest; replay the protected oracle only in provider-local temporary territory.")
-  ("postcondition" "Return an advisory ImprovementCandidateReview bound to the exact proposal, with zero inference and no customer mutation.")
-  ("refusal" "Refuse foreign bindings, writable or changed oracle evidence, source drift, digest drift, unsupported product classes, failed replay, or assay authorship by the candidate supplier.")
-  ("invariants" ("typed-attributable-review" "producer-identity-neutral" "customer-oracle-remains-authoritative" "provider-local-replay-only" "zero-inference" "no-customer-mutation")))
