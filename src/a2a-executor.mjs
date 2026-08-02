@@ -1,8 +1,8 @@
 import { Message, Role } from "@a2a-js/sdk";
 import { extractRmnPart, rmnPart } from "@red-cup-engineering/a2a-rmn-part-service";
-import { decodeSemantic, semanticBytes, semanticId } from "@red-cup-engineering/rmn-semantic-conformance";
-import { decodeRelationalValue } from "@red-cup-engineering/rmn-semantic-conformance/relational-value";
-import { relationalWitnessJournalDocument } from "@lenticule-science/witness-journal-rdf-projection-service/client";
+import { decodeSemantic, semanticBytes, semanticId } from "@red-cup-engineering/relation-model-notation-runtime";
+import { decodeRelationalValue } from "@red-cup-engineering/relation-model-notation-runtime/relational-value";
+import { relationalWitnessJournalDocument } from "@red-cup-engineering/witness-journal-rdf-projection-service/client";
 import { ACTOR, assaySoftwareChangeProposal } from "./assay.mjs";
 
 const id = (value) => semanticId(relationalWitnessJournalDocument(value));
