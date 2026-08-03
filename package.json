@@ -1,6 +1,6 @@
 {
   "name": "@lenticule-science/software-change-proposal-assay",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,7 +13,7 @@
     "serve-software-change-proposal-assay-a2a": "scripts/serve-a2a.mjs"
   },
   "scripts": {
-    "check": "node --check src/assay.mjs && node --check src/client.mjs && node --check src/a2a-executor.mjs && node --check scripts/execute-a2a-message.mjs && node --check scripts/serve-a2a.mjs",
+    "check": "node --check src/semantic-json.mjs && node --check src/assay.mjs && node --check src/client.mjs && node --check src/a2a-executor.mjs && node --check scripts/execute-a2a-message.mjs && node --check scripts/serve-a2a.mjs",
     "test": "node --test",
     "verify": "npm run check && npm test"
   },
@@ -22,7 +22,6 @@
     "@red-cup-engineering/a2a-contracted-agent-service": "2.0.5",
     "@red-cup-engineering/a2a-rmn-part-service": "1.0.1",
     "@red-cup-engineering/a2a-rmn-task-client-service": "1.1.1",
-    "@red-cup-engineering/relation-model-notation-runtime": "7.0.0",
-    "@red-cup-engineering/witness-journal-rdf-projection-service": "1.1.0"
+    "@red-cup-engineering/semantic-content-identify-service": "0.2.2"
   }
 }

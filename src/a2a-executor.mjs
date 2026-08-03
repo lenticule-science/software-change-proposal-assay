@@ -1,14 +1,11 @@
 import { Message, Role } from "@a2a-js/sdk";
 import { extractRmnPart, rmnPart } from "@red-cup-engineering/a2a-rmn-part-service";
-import { decodeSemantic, semanticBytes, semanticId } from "@red-cup-engineering/relation-model-notation-runtime";
-import { decodeRelationalValue } from "@red-cup-engineering/relation-model-notation-runtime/relational-value";
-import { relationalWitnessJournalDocument } from "@red-cup-engineering/witness-journal-rdf-projection-service/client";
 import { ACTOR, assaySoftwareChangeProposal } from "./assay.mjs";
+import { semanticJsonBytes, semanticJsonFromBytes, semanticJsonId, semanticJsonRecord as record } from "./semantic-json.mjs";
 
-const id = (value) => semanticId(relationalWitnessJournalDocument(value));
-const record = (body) => Object.freeze({ id: id(body), ...body });
-export const operationBytes = (value) => semanticBytes(relationalWitnessJournalDocument(value));
-export function operationFromBytes(bytes) { const term = decodeSemantic(bytes); if (term?.[0] !== "ascribe" || term.length !== 3) throw new Error("assay operation is not one typed relational RMN document"); return decodeRelationalValue(term[1], term[2]); }
+const id = semanticJsonId;
+export const operationBytes = semanticJsonBytes;
+export const operationFromBytes = semanticJsonFromBytes;
 function exact(value) { const body = value && typeof value === "object" ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "id")) : null; return body && value.id === id(body); }
 export async function executeOperation(request, options = {}) {
   if (!exact(request) || request.provider !== ACTOR || request.type !== "SoftwareChangeProposalAssayOperation" || request.assayRequest?.type !== "SoftwareChangeProposalAssayRequest") throw new Error("exact provider-addressed canonical RMN assay operation is required");

@@ -3,11 +3,10 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import { semanticId } from "@red-cup-engineering/relation-model-notation-runtime";
-import { relationalWitnessJournalDocument } from "@red-cup-engineering/witness-journal-rdf-projection-service/client";
+import { semanticJsonId, semanticJsonRecord } from "./semantic-json.mjs";
 
 export const ACTOR = "urn:ame:software-change-proposal-assay";
-export function record(body) { return Object.freeze({ id: semanticId(relationalWitnessJournalDocument(body)), ...body }); }
+export const record = semanticJsonRecord;
 const sha = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const inside = (root, path) => { const rel = relative(root, path); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
 const allowed = (path, roots, forbidden) => roots.some((root) => path === root || path.startsWith(`${root}/`)) && !forbidden.some((root) => path === root || path.startsWith(`${root}/`));
@@ -15,7 +14,7 @@ const allowed = (path, roots, forbidden) => roots.some((root) => path === root |
 function replay(request) {
   const { lot, award, candidate } = request; const change = candidate?.changes?.[0];
   if (lot?.type !== "SoftwareDevelopmentWorkLot" || award?.type !== "Accept" || award.object?.type !== "ImprovementProposalAward" || candidate?.type !== "SoftwareChangeProposal") throw new Error("proposal-lot-award-binding");
-  if (candidate.lot !== lot.id || candidate.award !== award.id || candidate.supplier !== award.object.supplier || candidate.id !== semanticId(relationalWitnessJournalDocument(Object.fromEntries(Object.entries(candidate).filter(([key]) => key !== "id"))))) throw new Error("proposal-identity-or-award-binding");
+  if (candidate.lot !== lot.id || candidate.award !== award.id || candidate.supplier !== award.object.supplier || candidate.id !== semanticJsonId(Object.fromEntries(Object.entries(candidate).filter(([key]) => key !== "id")))) throw new Error("proposal-identity-or-award-binding");
   if (lot.productContract?.type !== "BoundedInferenceIntentCompiler" || candidate.changes?.length !== 1 || change.path !== "src/generated-resolvers/bounded-inference-intent-compiler.mjs") throw new Error("unsupported-product-or-target");
   if (!allowed(change.path, lot.ownedTargetRoots ?? [], lot.forbiddenRoots ?? []) || candidate.upwardEscalationAuthorized !== false) throw new Error("authority-or-upward-escalation");
   const territory = resolve(lot.boardTerms?.territory ?? ""); if (!isAbsolute(territory)) throw new Error("customer-territory");
