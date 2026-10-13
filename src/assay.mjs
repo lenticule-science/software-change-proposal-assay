@@ -10,6 +10,17 @@ export const record = semanticJsonRecord;
 const sha = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 const inside = (root, path) => { const rel = relative(root, path); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
 const allowed = (path, roots, forbidden) => roots.some((root) => path === root || path.startsWith(`${root}/`)) && !forbidden.some((root) => path === root || path.startsWith(`${root}/`));
+// lstat each existing path segment: lexical containment alone does not prevent
+// a customer pathname from traversing a symlink into another territory.
+function hasSymlinkSegment(root, path) {
+  let cursor = root;
+  if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink()) return true;
+  for (const segment of relative(root, path).split(sep).filter(Boolean)) {
+    cursor = join(cursor, segment);
+    if (lstatSync(cursor, { throwIfNoEntry: false })?.isSymbolicLink()) return true;
+  }
+  return false;
+}
 
 function replay(request) {
   const { lot, award, candidate } = request; const change = candidate?.changes?.[0];
@@ -17,14 +28,16 @@ function replay(request) {
   if (candidate.lot !== lot.id || candidate.award !== award.id || candidate.supplier !== award.object.supplier || candidate.id !== semanticJsonId(Object.fromEntries(Object.entries(candidate).filter(([key]) => key !== "id")))) throw new Error("proposal-identity-or-award-binding");
   if (lot.productContract?.type !== "BoundedInferenceIntentCompiler" || candidate.changes?.length !== 1 || change.path !== "src/generated-resolvers/bounded-inference-intent-compiler.mjs") throw new Error("unsupported-product-or-target");
   if (!allowed(change.path, lot.ownedTargetRoots ?? [], lot.forbiddenRoots ?? []) || candidate.upwardEscalationAuthorized !== false) throw new Error("authority-or-upward-escalation");
-  const territory = resolve(lot.boardTerms?.territory ?? ""); if (!isAbsolute(territory)) throw new Error("customer-territory");
-  const target = resolve(territory, change.path); if (!inside(territory, target) || (existsSync(target) && lstatSync(target).isSymbolicLink())) throw new Error("target-boundary");
+  const territoryClaim = lot.boardTerms?.territory;
+  if (typeof territoryClaim !== "string" || !isAbsolute(territoryClaim) || !existsSync(territoryClaim) || lstatSync(territoryClaim).isSymbolicLink()) throw new Error("customer-territory");
+  const territory = resolve(territoryClaim);
+  const target = resolve(territory, change.path); if (!inside(territory, target) || hasSymlinkSegment(territory, target)) throw new Error("target-boundary");
   const before = existsSync(target) ? readFileSync(target) : Buffer.alloc(0);
   if (change.beforeExisted !== existsSync(target) || change.beforeDigest !== sha(before)) throw new Error("source-drift");
   const after = Buffer.from(change.afterBytesBase64 ?? "", "base64"); if (change.afterDigest !== sha(after)) throw new Error("candidate-drift");
   const artifact = lot.acceptanceArtifacts?.[0]; const command = lot.acceptanceCommands?.[0];
   if (!artifact || artifact.path !== command?.argv?.[0] || command.runner !== "node" || lot.ownedTargetRoots.some((root) => artifact.path === root || artifact.path.startsWith(`${root}/`))) throw new Error("protected-oracle-boundary");
-  const oraclePath = resolve(territory, artifact.path); if (!inside(territory, oraclePath) || !existsSync(oraclePath) || lstatSync(oraclePath).isSymbolicLink()) throw new Error("protected-oracle-path");
+  const oraclePath = resolve(territory, artifact.path); if (!inside(territory, oraclePath) || !existsSync(oraclePath) || hasSymlinkSegment(territory, oraclePath)) throw new Error("protected-oracle-path");
   const oracle = readFileSync(oraclePath); if (sha(oracle) !== artifact.digest || !lot.sourceDigests.includes(artifact.digest)) throw new Error("protected-oracle-drift");
   const sandbox = mkdtempSync(join(tmpdir(), "software-change-proposal-assay-"));
   try {
