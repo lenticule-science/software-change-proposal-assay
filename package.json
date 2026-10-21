@@ -27,5 +27,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lenticule-science/software-change-proposal-assay.git"
+  },
+  "license": "MIT",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/561-group/.github/blob/main/TIPS.md"
   }
 }
