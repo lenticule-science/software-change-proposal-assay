@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { assaySoftwareChangeProposal, assaySoftwareChangeProposalInHost, completeCustomerAssayTap, record } from "../src/assay.mjs";
 import { controlledLocalAssayFixture } from "./fixtures/controlled-local-assay.mjs";
+import { semanticJsonId } from "../src/semantic-json.mjs";
 // A literal, TEST-ONLY stand-in for an independently authenticated host Work
 // authority. Production MUST bind the real original Office/tenant permission
 // provider; never use this callback or acceptance fixture on serving hosts.
@@ -285,4 +286,40 @@ test("a fake isolated host claiming complete cases without runner evidence canno
   });
   assert.equal(review.accepted,false);
   assert.equal(review.reason,"assay-incomplete");
+});
+
+test("changing source obligations beneath an authorized Work ID refuses before protected reads or code execution",async()=>{
+  const {request,territory}=contractFixture();
+  const admitted=semanticJsonId(request);
+  let executions=0,originalScopes=0;
+  const options={
+    authorizeWork:async scope=>{
+      originalScopes++;
+      return {...scope,authorized:scope.requestAddress===admitted};
+    },
+    isolatedAssayExecutor:async()=>{
+      executions++;
+      return {isolated:false,status:0,stdout:"",stderr:""};
+    },
+  };
+  const allowed=await assaySoftwareChangeProposalInHost(request,options);
+  assert.equal(allowed.reason,"isolated-assay-unverified");
+  assert.equal(executions,1,"ordinary source reached the actual host provider");
+  const variants=[
+    {...request,lot:{...request.lot,acceptanceTests:["unreviewed-criterion"]}},
+    {...request,lot:{...request.lot,resourceCeilings:{runtimeMs:10000}}},
+    {...request,lot:{...request.lot,forbiddenRoots:[]}},
+    {...request,lot:{...request.lot,sourceDigests:[...request.lot.sourceDigests,"sha256:"+"f".repeat(64)]}},
+    {...request,lot:{...request.lot,acceptanceCommands:[
+      {runner:"node",argv:["--test","unadopted-new-oracle.mjs"]}]}},
+  ];
+  for (const attempted of variants) {
+    const refusal=await assaySoftwareChangeProposalInHost(attempted,options);
+    assert.equal(refusal.accepted,false);
+    assert.equal(refusal.reason,"work-authority-unverified");
+    assert.equal(executions,1,"unadopted lot reached no runner");
+    assert.equal(existsSync(join(territory,targetRel)),false);
+  }
+  assert.equal(originalScopes,1+variants.length);
+  assert.equal(semanticJsonId(request),admitted,"original customer request retained");
 });
