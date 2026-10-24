@@ -49,7 +49,7 @@ function contractFixture() {
     request: { type: "SoftwareChangeProposalAssayRequest", lot, award, candidate } };
 }
 
-test("behavioral assay replays a hermetic customer oracle without customer mutation", async () => {
+test("controlled host-fixture executes declared customer cases without altering the customer repository", async () => {
   const { territory, request } = contractFixture();
   const review = await assay(request);
   assert.equal(review.accepted, true, review.reason);
@@ -68,7 +68,7 @@ test("requires an existing absolute customer territory, never the process workin
     assert.equal(review.reason, "customer-territory");
   }
   const lot = { ...request.lot, boardTerms: { territory: join(tmpdir(), "nonexistent-unique-tunesday-territory") } };
-  assert.equal(await assay({ ...request, lot }).reason, "customer-territory");
+  assert.equal((await assay({ ...request, lot })).reason, "customer-territory");
 });
 
 test("rejects symlinked target ancestors even when the target file is not yet present", async () => {
