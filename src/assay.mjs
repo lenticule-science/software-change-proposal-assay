@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { semanticJsonId, semanticJsonRecord } from "./semantic-json.mjs";
+import {
+  semanticJsonBytes, semanticJsonFromBytes, semanticJsonId, semanticJsonRecord,
+} from "./semantic-json.mjs";
 
 export const ACTOR = "urn:ame:software-change-proposal-assay";
 export const record = semanticJsonRecord;
@@ -163,12 +165,19 @@ export async function assaySoftwareChangeProposalInHost(request, { isolatedAssay
   if (typeof authorizeWork !== "function")
     return result(request, "work-authority-unavailable");
   try {
+    // Use the existing native semiotic JSON codec to detach the caller's
+    // mutable record before the first async host-authority check. A caller
+    // must not swap customer, candidate, source digest or territory during
+    // an await and trick an already-authorized read into crossing tenants.
+    // It also preserves original canonical JSON admission; there is no
+    // home-grown shadow content digest or second contract parser.
+    const source = semanticJsonFromBytes(semanticJsonBytes(request));
     const scope = Object.freeze({
-      customer: request?.lot?.consumer,
-      lot: request?.lot?.id,
-      award: request?.award?.id,
-      candidate: request?.candidate?.id,
-      territory: request?.lot?.boardTerms?.territory,
+      customer: source?.lot?.consumer,
+      lot: source?.lot?.id,
+      award: source?.award?.id,
+      candidate: source?.candidate?.id,
+      territory: source?.lot?.boardTerms?.territory,
     });
     const authority = await authorizeWork(scope);
     if (!authority || authority.authorized !== true ||
@@ -176,8 +185,8 @@ export async function assaySoftwareChangeProposalInHost(request, { isolatedAssay
         authority.lot !== scope.lot || authority.award !== scope.award ||
         authority.candidate !== scope.candidate ||
         authority.territory !== scope.territory)
-      return result(request, "work-authority-unverified");
-    const plan = prepare(request);
+      return result(source, "work-authority-unverified");
+    const plan = prepare(source);
     const run = await isolatedAssayExecutor(plan.execution);
     if (!run || run.isolated !== true ||
         !Number.isInteger(run.status) || typeof run.stdout !== "string" ||
@@ -185,9 +194,9 @@ export async function assaySoftwareChangeProposalInHost(request, { isolatedAssay
         run.stdout.length > plan.execution.maxOutputBytes ||
         run.stderr.length > plan.execution.maxOutputBytes ||
         run.truncated === true || run.timedOut === true || run.signal)
-      return result(request, "isolated-assay-unverified");
+      return result(source, "isolated-assay-unverified");
     if (run.status !== 0)
-      return result(request, `protected-oracle-replay:${run.status}:${sha(Buffer.from(run.stderr))}`);
+      return result(source, `protected-oracle-replay:${run.status}:${sha(Buffer.from(run.stderr))}`);
 
     // Host-owned test execution accounting MUST report all and only the
     // customer-protected cases. Exit 0 and a successful file wrapper are not
@@ -198,8 +207,8 @@ export async function assaySoftwareChangeProposalInHost(request, { isolatedAssay
       values.every(name => plan.expectedAssays.includes(name));
     if (!sameNames(run.executedAssays) || !sameNames(run.passedAssays) ||
         !Array.isArray(run.failedAssays) || run.failedAssays.length !== 0)
-      return result(request, "assay-incomplete");
-    return result(request, null, {
+      return result(source, "assay-incomplete");
+    return result(source, null, {
       oracle: plan.oracle, candidate: plan.candidate,
       replayStatus: run.status, hostReportedIsolation: true,
       completedCustomerAssays: [...plan.expectedAssays],
