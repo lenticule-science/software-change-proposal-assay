@@ -197,19 +197,26 @@ export async function assaySoftwareChangeProposalInHost(request, { isolatedAssay
     // It also preserves original canonical JSON admission; there is no
     // home-grown shadow content digest or second contract parser.
     const source = semanticJsonFromBytes(semanticJsonBytes(request));
+    // A lot ID or candidate ID alone does not pin the customer's accepted
+    // criterion set, source digests, allowed paths, resource policy or oracle.
+    // Authorize the *entire original request bytes* via the existing semantic
+    // identity before any host filesystem read. Otherwise a caller could
+    // substitute new acceptance clauses beneath an already-approved Work ID.
     const scope = Object.freeze({
       customer: source?.lot?.consumer,
       lot: source?.lot?.id,
       award: source?.award?.id,
       candidate: source?.candidate?.id,
       territory: source?.lot?.boardTerms?.territory,
+      requestAddress: semanticJsonId(source),
     });
     const authority = await authorizeWork(scope);
     if (!authority || authority.authorized !== true ||
         authority.customer !== scope.customer ||
         authority.lot !== scope.lot || authority.award !== scope.award ||
         authority.candidate !== scope.candidate ||
-        authority.territory !== scope.territory)
+        authority.territory !== scope.territory ||
+        authority.requestAddress !== scope.requestAddress)
       return result(source, "work-authority-unverified");
     const plan = prepare(source);
     const run = await isolatedAssayExecutor(plan.execution);
