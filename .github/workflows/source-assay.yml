@@ -1,0 +1,105 @@
+name: Software change assay source and host-bound receiving
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/source-assay.yml'
+      - 'package.json'
+      - 'src/**'
+      - 'test/**'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: software-change-assay-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact public engineering source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+        with:
+          persist-credentials: false
+      - name: Select Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # 4.4.0
+        with:
+          node-version: '24'
+      - name: Verify current original source syntax and forbid host-process fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/assay.mjs
+          node --check src/a2a-executor.mjs
+          node --check test/assay.test.mjs
+          node --check test/fixtures/controlled-local-assay.mjs
+          # This is a negative source boundary, NOT a runtime sandbox test.
+          # The only ordinary child process lives in an explicitly test-only fixture.
+          if grep -nE 'spawnSync|execSync|child_process|mkdtempSync' src/assay.mjs; then
+            echo 'Ambient supplier code execution unexpectedly returned' >&2
+            exit 1
+          fi
+          test -f test/fixtures/controlled-local-assay.mjs
+      - name: Receive actual core assay tests against the exact released semantic identity provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This is a source-only test of src/assay.mjs, NOT a substitute
+          # for the package's full A2A dependency/consumer closure below.
+          fixture="$RUNNER_TEMP/native-assay"
+          mkdir -p "$fixture"
+          printf '%s\n' '{"name":"assay-source-receiver","version":"0.0.0","private":true,"type":"module","dependencies":{"@red-cup-engineering/semantic-content-identify-service":"0.2.2"}}' > "$fixture/package.json"
+          npm install --prefix "$fixture" --ignore-scripts --no-audit --no-fund --no-package-lock --registry=https://registry.561.group/
+          test ! -e node_modules
+          ln -s "$fixture/node_modules" node_modules
+          node --check src/assay.mjs
+          node --test test/assay.test.mjs
+          rm node_modules
+      - name: Qualify exact published provider dependency manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A published package must be usable outside its original PNPM tree.
+          # Exact source-owned Registry metadata, not a guessed latest version.
+          failed=0
+          for specification in \
+            '@red-cup-engineering/a2a-contracted-agent-service@2.0.5' \
+            '@red-cup-engineering/a2a-rmn-part-service@1.0.1' \
+            '@red-cup-engineering/a2a-rmn-task-client-service@1.1.1' \
+            '@red-cup-engineering/semantic-content-identify-service@0.2.2'; do
+            if ! metadata="$(npm view "$specification" dependencies --json --registry=https://registry.561.group/ 2>/dev/null)"; then
+              echo "UNRELEASED_OR_INACCESSIBLE_PIN: $specification" >&2
+              name="${specification%@*}"
+              versions="$(npm view "$name" versions --json --registry=https://registry.561.group/ 2>/dev/null || echo '[]')"
+              node -e '
+                const [name, raw] = process.argv.slice(1);
+                const versions = JSON.parse(raw || "[]");
+                console.error("Available released",name,
+                  JSON.stringify(Array.isArray(versions) ? versions.slice(-12) : []));
+              ' "$name" "$versions"
+              failed=1
+              continue
+            fi
+            if ! node -e '
+              const [name, raw] = process.argv.slice(1);
+              const deps = JSON.parse(raw || "null") || {};
+              const invalid = Object.entries(deps).filter(([_, spec]) =>
+                typeof spec !== "string" || /^(workspace:|file:|link:)/u.test(spec));
+              if (invalid.length) {
+                console.error("UNINSTALLABLE_PUBLISHED_DEPENDENCY", name,
+                  JSON.stringify(invalid));
+                process.exitCode = 1;
+              } else console.log("registry dependency contract admitted:",name);
+            ' "$specification" "$metadata"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - name: Install original package requirements
+        run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock --registry=https://registry.561.group/
+      - name: Native original source and full negative test receiving
+        run: npm run verify
