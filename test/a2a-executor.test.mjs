@@ -1,3 +1,18 @@
-import assert from "node:assert/strict"; import test from "node:test"; import { Message, Role } from "@a2a-js/sdk"; import { extractRmnPart, rmnPart } from "@red-cup-engineering/a2a-rmn-part-service"; import { relationalWitnessJournalDocument } from "@red-cup-engineering/witness-journal-rdf-projection-service/client"; import { ACTOR } from "../src/assay.mjs"; import { executeA2aMessage, operationBytes, operationFromBytes } from "../src/a2a-executor.mjs"; import { semanticJsonId } from "../src/semantic-json.mjs";
+import assert from "node:assert/strict"; import test from "node:test"; import { Message, Role } from "@a2a-js/sdk"; import { extractRmnPart, rmnPart } from "@red-cup-engineering/a2a-rmn-part-service"; import { relationalWitnessJournalDocument } from "@red-cup-engineering/witness-journal-rdf-projection-service/client"; import { ACTOR } from "../src/assay.mjs"; import { executeA2aMessage, executeOperation, operationBytes, operationFromBytes } from "../src/a2a-executor.mjs"; import { semanticJsonId } from "../src/semantic-json.mjs";
 const exact=(body)=>({id:semanticJsonId(relationalWitnessJournalDocument(body)),...body});
 test("the assay admits one canonical RMN operation through A2A",async()=>{const assayRequest={type:"SoftwareChangeProposalAssayRequest",candidate:{id:"ni:///sha-256;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},request=exact({type:"SoftwareChangeProposalAssayOperation",provider:ACTOR,assayRequest}),message=Message.toJSON({messageId:"1",contextId:"",taskId:"",role:Role.ROLE_USER,parts:[rmnPart(operationBytes(request))],metadata:{},extensions:[],referenceTaskIds:[]}),output=await executeA2aMessage(message,{assaySoftwareChangeProposal:()=>({type:"ImprovementCandidateReview",candidate:assayRequest.candidate.id,accepted:false})}),response=operationFromBytes(extractRmnPart(Message.fromJSON(output).parts).bytes);assert.equal(response.type,"SoftwareChangeProposalAssayResult");assert.equal(response.review.candidate,assayRequest.candidate.id);});
+
+test("real A2A operation cannot accept a remote caller's fake isolation grant",async()=>{
+  const work={type:"SoftwareChangeProposalAssayRequest",
+    candidate:{id:"ni:///sha-256;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+    isolatedAssayExecutor: {isolated:true,status:0},
+  };
+  const request=exact({type:"SoftwareChangeProposalAssayOperation",
+    provider:ACTOR,assayRequest:work});
+  const response=await executeOperation(request);
+  assert.equal(response.type,"SoftwareChangeProposalAssayResult");
+  assert.equal(response.review.accepted,false);
+  assert.equal(response.review.reason,"isolated-assay-unavailable");
+  assert.equal(response.review.evidence.customerFilesystemWrites,0);
+  assert.equal(response.review.evidence.independentCustomerAcceptance,false);
+});
