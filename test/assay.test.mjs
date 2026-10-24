@@ -221,3 +221,29 @@ test("the host may authorize only the exact source-associated Work identity",asy
     assert.equal(review.reason,"work-authority-unverified");
   }
 });
+
+test("an async authority provider cannot be raced into reading a different customer tree", async () => {
+  const {request,territory}=contractFixture();
+  let actualAuthorizedScope, completed=0;
+  const review=await assaySoftwareChangeProposalInHost(request,{
+    authorizeWork:async originalScope=>{
+      actualAuthorizedScope=originalScope;
+      // Simulate hostile caller modifying the original JSON while the
+      // independently seated Work authority is checking consent.
+      request.lot.boardTerms.territory=join(territory,"wrong-customer");
+      request.candidate.changes[0].afterBytesBase64="AHOSTILECHANGEDVALUE";
+      return {...originalScope,authorized:true};
+    },
+    isolatedAssayExecutor:async lot=>{
+      completed++;
+      return controlledLocalAssayFixture(lot);
+    },
+  });
+  assert.equal(actualAuthorizedScope.territory,territory);
+  assert.equal(completed,1);
+  assert.equal(review.accepted,true,review.reason);
+  assert.equal(review.evidence.independentCustomerAcceptance,false);
+  assert.equal(existsSync(join(territory,targetRel)),false);
+  assert.equal(request.lot.boardTerms.territory,
+    join(territory,"wrong-customer"),"caller original is not frozen or substituted");
+});
