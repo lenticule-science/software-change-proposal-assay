@@ -152,10 +152,31 @@ export function assaySoftwareChangeProposal(request) {
  * resource limits and descendant termination. The returned isolation flag
  * alone is NOT a cryptographic or kernel proof of such enforcement.
  */
-export async function assaySoftwareChangeProposalInHost(request, { isolatedAssayExecutor } = {}) {
+export async function assaySoftwareChangeProposalInHost(request, { isolatedAssayExecutor, authorizeWork } = {}) {
   if (typeof isolatedAssayExecutor !== "function")
     return result(request, "isolated-assay-unavailable");
+  // A source-supplied boardTerms.territory is NOT an authorization to read the
+  // customer's Work tree or protected acceptance oracle. A genuine original
+  // host Work/tenant provider must authorize that exact customer, Work, award,
+  // candidate and territory BEFORE prepare() performs any filesystem read.
+  // Neither this module nor serialized A2A request can self-grant the right.
+  if (typeof authorizeWork !== "function")
+    return result(request, "work-authority-unavailable");
   try {
+    const scope = Object.freeze({
+      customer: request?.lot?.consumer,
+      lot: request?.lot?.id,
+      award: request?.award?.id,
+      candidate: request?.candidate?.id,
+      territory: request?.lot?.boardTerms?.territory,
+    });
+    const authority = await authorizeWork(scope);
+    if (!authority || authority.authorized !== true ||
+        authority.customer !== scope.customer ||
+        authority.lot !== scope.lot || authority.award !== scope.award ||
+        authority.candidate !== scope.candidate ||
+        authority.territory !== scope.territory)
+      return result(request, "work-authority-unverified");
     const plan = prepare(request);
     const run = await isolatedAssayExecutor(plan.execution);
     if (!run || run.isolated !== true ||
