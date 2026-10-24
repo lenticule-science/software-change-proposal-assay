@@ -123,6 +123,31 @@ function prepare(request) {
   });
 }
 
+/**
+ * A successful test-file wrapper and a vendor/host summary array are not
+ * sufficient evidence that customer-defined tests executed. Demand the
+ * trusted Node TAP runner's complete accounting alongside the independent
+ * host-owned exact case names. This only validates a selected runner's output
+ * structure; it does not establish the runner's OS isolation or authenticity.
+ */
+export function completeCustomerAssayTap(stdout, numberOfCustomerTests) {
+  if (typeof stdout !== "string" || !stdout.startsWith("TAP version 13\n") ||
+      !Number.isInteger(numberOfCustomerTests) || numberOfCustomerTests < 1)
+    return false;
+  const counters = {};
+  for (const key of ["tests", "pass", "fail", "cancelled", "skipped", "todo"]) {
+    const hits = [...stdout.matchAll(new RegExp("^# " + key + " ([0-9]+)$", "gm"))];
+    if (hits.length !== 1) return false;
+    const amount = Number(hits[0][1]);
+    if (!Number.isSafeInteger(amount)) return false;
+    counters[key] = amount;
+  }
+  return counters.tests === numberOfCustomerTests &&
+    counters.pass === numberOfCustomerTests &&
+    counters.fail === 0 && counters.cancelled === 0 &&
+    counters.skipped === 0 && counters.todo === 0;
+}
+
 function result(request, reason, evidence = {}) {
   return record({
     type: "ImprovementCandidateReview", actor: ACTOR,
@@ -206,7 +231,8 @@ export async function assaySoftwareChangeProposalInHost(request, { isolatedAssay
       new Set(values).size === plan.expectedAssays.length &&
       values.every(name => plan.expectedAssays.includes(name));
     if (!sameNames(run.executedAssays) || !sameNames(run.passedAssays) ||
-        !Array.isArray(run.failedAssays) || run.failedAssays.length !== 0)
+        !Array.isArray(run.failedAssays) || run.failedAssays.length !== 0 ||
+        !completeCustomerAssayTap(run.stdout, plan.expectedAssays.length))
       return result(source, "assay-incomplete");
     return result(source, null, {
       oracle: plan.oracle, candidate: plan.candidate,
