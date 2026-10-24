@@ -15,6 +15,7 @@ export async function executeOperation(request, options = {}) {
   const review = await (options.assaySoftwareChangeProposal ??
     (work => assaySoftwareChangeProposalInHost(work, {
       isolatedAssayExecutor: options.isolatedAssayExecutor,
+      authorizeWork: options.authorizeWork,
     })))(request.assayRequest);
   return record({ type: "SoftwareChangeProposalAssayResult", provider: ACTOR, request: request.id, candidate: request.assayRequest.candidate?.id ?? null, review });
 }
