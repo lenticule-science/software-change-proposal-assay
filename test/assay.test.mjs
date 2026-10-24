@@ -6,8 +6,15 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { assaySoftwareChangeProposal, assaySoftwareChangeProposalInHost, record } from "../src/assay.mjs";
 import { controlledLocalAssayFixture } from "./fixtures/controlled-local-assay.mjs";
+// A literal, TEST-ONLY stand-in for an independently authenticated host Work
+// authority. Production MUST bind the real original Office/tenant permission
+// provider; never use this callback or acceptance fixture on serving hosts.
+const authorizeLiteralWork = async scope => Object.freeze({
+  ...scope, authorized: true,
+});
 const assay = request => assaySoftwareChangeProposalInHost(request, {
   isolatedAssayExecutor: controlledLocalAssayFixture,
+  authorizeWork: authorizeLiteralWork,
 });
 const sha = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 
@@ -139,6 +146,7 @@ test("an executor claim without isolation or complete host-observed assays canno
   ]) {
     const review = await assaySoftwareChangeProposalInHost(request,{
       isolatedAssayExecutor: async () => run,
+      authorizeWork: authorizeLiteralWork,
     });
     assert.equal(review.accepted,false,JSON.stringify(run));
   }
@@ -169,4 +177,47 @@ test("early exit before the customer test cannot counterfeit acceptance",async()
   const review=await assay({...request,candidate});
   assert.equal(review.accepted,false);
   assert.match(review.reason,/assay-incomplete|oracle-replay/u);
+});
+
+test("an isolated worker without a competent Work/tenant scope cannot read customer files",async()=>{
+  const { request, territory } = contractFixture();
+  let called=0;
+  const runner=async()=>{called++;throw new Error("must not execute");};
+  const missing=await assaySoftwareChangeProposalInHost(request,{
+    isolatedAssayExecutor:runner,
+  });
+  assert.equal(missing.accepted,false);
+  assert.equal(missing.reason,"work-authority-unavailable");
+  assert.equal(called,0);
+  const otherTenant=await assaySoftwareChangeProposalInHost(request,{
+    isolatedAssayExecutor:runner,
+    authorizeWork:async scope=>({ ...scope,customer:"foreign-customer",authorized:true }),
+  });
+  assert.equal(otherTenant.accepted,false);
+  assert.equal(otherTenant.reason,"work-authority-unverified");
+  assert.equal(called,0);
+  const forgedSource=await assaySoftwareChangeProposalInHost({
+    ...request,lot:{...request.lot,boardTerms:{territory:join(territory,"nonexistent-foreign-tree")}},
+  },{
+    isolatedAssayExecutor:runner,
+    authorizeWork:async scope=>({...scope,authorized:false}),
+  });
+  assert.equal(forgedSource.accepted,false);
+  assert.equal(forgedSource.reason,"work-authority-unverified");
+  assert.equal(called,0);
+});
+
+test("the host may authorize only the exact source-associated Work identity",async()=>{
+  const { request }=contractFixture();
+  for(const changed of [
+    {award:"another-award"},{lot:"different-work"},{candidate:"unseen-candidate"},
+    {territory:"/different/customer"},{customer:"another-customer"},
+  ]){
+    const review=await assaySoftwareChangeProposalInHost(request,{
+      isolatedAssayExecutor:async()=>{throw new Error("unauthorized execution");},
+      authorizeWork:async scope=>({...scope,...changed,authorized:true}),
+    });
+    assert.equal(review.accepted,false);
+    assert.equal(review.reason,"work-authority-unverified");
+  }
 });
