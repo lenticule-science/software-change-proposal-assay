@@ -29,6 +29,34 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # 4.4.0
         with:
           node-version: '24'
+      - name: Qualify exact published provider dependency manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A published package must be usable outside its original PNPM tree.
+          # Exact source-owned Registry metadata, not a guessed latest version.
+          failed=0
+          for specification in \
+            '@red-cup-engineering/a2a-contracted-agent-service@2.0.5' \
+            '@red-cup-engineering/a2a-rmn-part-service@1.0.1' \
+            '@red-cup-engineering/a2a-rmn-task-client-service@1.1.1' \
+            '@red-cup-engineering/semantic-content-identify-service@0.2.2'; do
+            metadata="$(npm view "$specification" dependencies --json --registry=https://registry.561.group/)" || exit 1
+            if ! node -e '
+              const [name, raw] = process.argv.slice(1);
+              const deps = JSON.parse(raw || "null") || {};
+              const invalid = Object.entries(deps).filter(([_, spec]) =>
+                typeof spec !== "string" || /^(workspace:|file:|link:)/u.test(spec));
+              if (invalid.length) {
+                console.error("UNINSTALLABLE_PUBLISHED_DEPENDENCY", name,
+                  JSON.stringify(invalid));
+                process.exitCode = 1;
+              } else console.log("registry dependency contract admitted:",name);
+            ' "$specification" "$metadata"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
       - name: Install original package requirements
         run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock --registry=https://registry.561.group/
       - name: Native original source and full negative test receiving
