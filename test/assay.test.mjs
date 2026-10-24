@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync, wr
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { assaySoftwareChangeProposal, assaySoftwareChangeProposalInHost, record } from "../src/assay.mjs";
+import { assaySoftwareChangeProposal, assaySoftwareChangeProposalInHost, completeCustomerAssayTap, record } from "../src/assay.mjs";
 import { controlledLocalAssayFixture } from "./fixtures/controlled-local-assay.mjs";
 // A literal, TEST-ONLY stand-in for an independently authenticated host Work
 // authority. Production MUST bind the real original Office/tenant permission
@@ -246,4 +246,43 @@ test("an async authority provider cannot be raced into reading a different custo
   assert.equal(existsSync(join(territory,targetRel)),false);
   assert.equal(request.lot.boardTerms.territory,
     join(territory,"wrong-customer"),"caller original is not frozen or substituted");
+});
+
+test("TAP receipt cannot confuse a passing wrapper, skipped test, or missing counters with customer acceptance",()=>{
+  const complete=[
+    "TAP version 13",
+    "# Subtest: bounded-intent-positive",
+    "ok 1 - bounded-intent-positive",
+    "1..1","# tests 1","# suites 0","# pass 1",
+    "# fail 0","# cancelled 0","# skipped 0","# todo 0",
+  ].join("\n")+"\n";
+  assert.equal(completeCustomerAssayTap(complete,1),true);
+  const invalid=[
+    complete.replace("# tests 1","# tests 2"),
+    complete.replace("# pass 1","# pass 0"),
+    complete.replace("# skipped 0","# skipped 1"),
+    complete.replace("# todo 0","# todo 1"),
+    complete.replace("# fail 0","# fail 1"),
+    complete.replace("# cancelled 0","# cancelled 1"),
+    complete.replace("TAP version 13","host says success"),
+    complete+"# pass 1\n",
+    "TAP version 13\n# pass 1\n# tests 1\n",
+    "",
+  ];
+  for(const tap of invalid)
+    assert.equal(completeCustomerAssayTap(tap,1),false,JSON.stringify(tap));
+});
+
+test("a fake isolated host claiming complete cases without runner evidence cannot grant acceptance",async()=>{
+  const {request}=contractFixture();
+  const review=await assaySoftwareChangeProposalInHost(request,{
+    authorizeWork: authorizeLiteralWork,
+    isolatedAssayExecutor:async()=>({
+      isolated:true,status:0,stdout:"",stderr:"",
+      executedAssays:["bounded-intent-positive"],
+      passedAssays:["bounded-intent-positive"],failedAssays:[],
+    }),
+  });
+  assert.equal(review.accepted,false);
+  assert.equal(review.reason,"assay-incomplete");
 });
