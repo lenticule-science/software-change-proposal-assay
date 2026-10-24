@@ -1,0 +1,44 @@
+name: Software change assay source and host-bound receiving
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/source-assay.yml'
+      - 'package.json'
+      - 'src/**'
+      - 'test/**'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: software-change-assay-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact public engineering source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+        with:
+          persist-credentials: false
+      - name: Select Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # 4.4.0
+        with:
+          node-version: '24'
+      - name: Install original package requirements
+        run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock --registry=https://registry.561.group/
+      - name: Native original source and full negative test receiving
+        run: npm run verify
+      - name: Refuse ambient candidate-process execution in the production module
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE 'spawnSync|execSync|child_process|mkdtempSync' src/assay.mjs; then
+            echo 'A temporary directory or local child process cannot isolate customer-supplied source' >&2
+            exit 1
+          fi
+          test -f test/fixtures/controlled-local-assay.mjs
