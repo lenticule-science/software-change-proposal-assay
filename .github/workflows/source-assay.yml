@@ -41,7 +41,19 @@ jobs:
             '@red-cup-engineering/a2a-rmn-part-service@1.0.1' \
             '@red-cup-engineering/a2a-rmn-task-client-service@1.1.1' \
             '@red-cup-engineering/semantic-content-identify-service@0.2.2'; do
-            metadata="$(npm view "$specification" dependencies --json --registry=https://registry.561.group/)" || exit 1
+            if ! metadata="$(npm view "$specification" dependencies --json --registry=https://registry.561.group/ 2>/dev/null)"; then
+              echo "UNRELEASED_OR_INACCESSIBLE_PIN: $specification" >&2
+              name="${specification%@*}"
+              versions="$(npm view "$name" versions --json --registry=https://registry.561.group/ 2>/dev/null || echo '[]')"
+              node -e '
+                const [name, raw] = process.argv.slice(1);
+                const versions = JSON.parse(raw || "[]");
+                console.error("Available released",name,
+                  JSON.stringify(Array.isArray(versions) ? versions.slice(-12) : []));
+              ' "$name" "$versions"
+              failed=1
+              continue
+            fi
             if ! node -e '
               const [name, raw] = process.argv.slice(1);
               const deps = JSON.parse(raw || "null") || {};
