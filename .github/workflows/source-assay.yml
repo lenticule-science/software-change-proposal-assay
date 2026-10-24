@@ -29,6 +29,21 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # 4.4.0
         with:
           node-version: '24'
+      - name: Receive actual core assay tests against the exact released semantic identity provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This is a source-only test of src/assay.mjs, NOT a substitute
+          # for the package's full A2A dependency/consumer closure below.
+          fixture="$RUNNER_TEMP/native-assay"
+          mkdir -p "$fixture"
+          printf '%s\n' '{"name":"assay-source-receiver","version":"0.0.0","private":true,"type":"module","dependencies":{"@red-cup-engineering/semantic-content-identify-service":"0.2.2"}}' > "$fixture/package.json"
+          npm install --prefix "$fixture" --ignore-scripts --no-audit --no-fund --no-package-lock --registry=https://registry.561.group/
+          test ! -e node_modules
+          ln -s "$fixture/node_modules" node_modules
+          node --check src/assay.mjs
+          node --test test/assay.test.mjs
+          rm node_modules
       - name: Qualify exact published provider dependency manifests
         shell: bash
         run: |
